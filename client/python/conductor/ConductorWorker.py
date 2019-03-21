@@ -35,12 +35,16 @@ class ConductorWorker:
         try:
             resp = exec_function(task)
             if resp is None:
-                raise Exception('Task execution function MUST return a response as a dict with status and output fields')
+                raise Exception(
+                    'Task execution function MUST return a response as a dict with status and output fields')
             task['status'] = resp['status']
-            task['outputData'] = resp['output']
             task['logs'] = resp['logs']
+            if resp.get('output'):
+                task['outputData'] = resp['output']
             if resp.get('reasonForIncompletion'):
                 task['reasonForIncompletion'] = resp['reasonForIncompletion']
+            if resp.get('callbackAfterSeconds'):
+                task['callbackAfterSeconds'] = resp['callbackAfterSeconds']
             self.taskClient.updateTask(task)
         except Exception as err:
             print('Error executing task: ' + str(err))
@@ -50,15 +54,18 @@ class ConductorWorker:
     def poll_and_execute(self, taskType, exec_function, domain=None):
         while True:
             time.sleep(float(self.polling_interval))
-            polled = self.taskClient.pollForTask(taskType, self.worker_id, domain)
+            polled = self.taskClient.pollForTask(
+                taskType, self.worker_id, domain)
             if polled is not None:
                 if self.taskClient.ackTask(polled['taskId'], self.worker_id):
                     self.execute(polled, exec_function)
 
     def start(self, taskType, exec_function, wait, domain=None):
-        print('Polling for task %s at a %f ms interval with %d threads for task execution, with worker id as %s' % (taskType, self.polling_interval * 1000, self.thread_count, self.worker_id))
+        print('Polling for task %s at a %f ms interval with %d threads for task execution, with worker id as %s' % (
+            taskType, self.polling_interval * 1000, self.thread_count, self.worker_id))
         for x in range(0, int(self.thread_count)):
-            thread = Thread(target=self.poll_and_execute, args=(taskType, exec_function, domain,))
+            thread = Thread(target=self.poll_and_execute,
+                            args=(taskType, exec_function, domain,))
             thread.daemon = True
             thread.start()
         if wait:
